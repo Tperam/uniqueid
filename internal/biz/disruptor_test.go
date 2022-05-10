@@ -1,7 +1,7 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-11 00:43:07
- * @LastEditTime: 2022-05-11 00:47:15
+ * @LastEditTime: 2022-05-11 01:14:18
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\disruptor_test.go
@@ -9,6 +9,7 @@
 package biz_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ import (
 
 func TestDisruptor(t *testing.T) {
 
-	goNum := 100 * 1
+	goNum := 1 * 68000
 	perGoRange := 1
 	arr := make([]uint64, goNum*perGoRange)
 	// biz.NewUniqueChanFill()
@@ -56,7 +57,7 @@ func TestDisruptor(t *testing.T) {
 	idMap := make(map[uint64]struct{}, goNum*perGoRange)
 	for i := range arr {
 		if _, ok := idMap[arr[i]]; ok {
-			panic("出现重复")
+			panic(fmt.Sprint("出现重复", arr[i]))
 		}
 		idMap[arr[i]] = struct{}{}
 	}

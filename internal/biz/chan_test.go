@@ -1,10 +1,10 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-10 17:01:52
- * @LastEditTime: 2022-05-10 18:52:42
+ * @LastEditTime: 2022-05-11 01:11:43
  * @LastEditors: Tperam
  * @Description:
- * @FilePath: \uniqueid\internal\biz\unique_chan_test.go
+ * @FilePath: \uniqueid\internal\biz\chan_test.go
  */
 package biz_test
 
@@ -18,11 +18,11 @@ import (
 
 func TestChan(t *testing.T) {
 
-	goNum := 100 * 10000
+	goNum := 10 * 10000
 	perGoRange := 1
 	arr := make([]uint64, goNum*perGoRange)
 	// biz.NewUniqueChanFill()
-	ch := make(chan uint64, 100000)
+	ch := make(chan uint64, 65535)
 	rb := biz.NewUniqueChan(ch)
 	u := biz.NewUniqueChanFill(nil, ch)
 

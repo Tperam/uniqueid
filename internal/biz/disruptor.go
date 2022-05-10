@@ -1,7 +1,7 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-10 23:26:23
- * @LastEditTime: 2022-05-11 00:42:49
+ * @LastEditTime: 2022-05-11 01:10:48
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\disruptor.go
@@ -25,6 +25,9 @@ type ringBuffer struct {
 	bufferMask   uint64
 	consumers    []*consume
 	consumerMask uint64
+
+	// 自增ID，确认落入哪个consumer
+	increment uint64
 
 	consumeCursor  uint64
 	producerCursor uint64
@@ -66,39 +69,40 @@ func NewRingBuffer(bufferSize, consumerSize uint64) *ringBuffer {
 		bufferMask:   bufferSize - 1,
 		consumers:    consumers,
 		consumerMask: consumerSize - 1,
-		waitQuene:    make([]uint64, consumerSize),
+		waitQuene:    make([]uint64, 0, consumerSize),
 	}
 }
 
 func (rb *ringBuffer) GetID() uint64 {
+	consumerID := atomic.AddUint64(&rb.increment, 1) & rb.consumerMask
+
+	rb.consumers[consumerID].mu.Lock()
+
 	consumeCursor := atomic.AddUint64(&rb.consumeCursor, 1)
-
-	rb.consumers[consumeCursor&rb.consumerMask].mu.Lock()
-
 	// doslow
-	if consumeCursor > rb.producerCursor {
+	if consumeCursor >= rb.producerCursor {
 
 		rb.waitQueneLock.Lock()
 		// 如果真的需要等待
-		if consumeCursor > rb.producerCursor {
+		if consumeCursor >= rb.producerCursor {
 			// 添加到等待队列
-			rb.waitQuene = append(rb.waitQuene, consumeCursor&rb.consumerMask)
-			rb.consumers[consumeCursor&rb.consumerMask].consuming = consumeCursor
+			rb.waitQuene = append(rb.waitQuene, consumerID)
+			rb.consumers[consumerID].consuming = consumeCursor
 			rb.waitQueneLock.Unlock()
 			// 尝试阻塞
-			<-rb.consumers[consumeCursor&rb.consumerMask].sign
+			<-rb.consumers[consumerID].sign
 		} else {
 			rb.waitQueneLock.Unlock()
 		}
 
 	}
 	result := rb.buffer[consumeCursor&rb.bufferMask]
-	rb.consumers[consumeCursor&rb.consumerMask].consumed = consumeCursor
-	rb.consumers[consumeCursor&rb.consumerMask].mu.Unlock()
+	rb.consumers[consumerID].consumed = consumeCursor
+	rb.consumers[consumerID].mu.Unlock()
 	return result
 }
 
-// 返回长度
+// 返回填充长度
 func (rb *ringBuffer) Fill(ids []uint64) uint64 {
 	rb.producerMu.Lock()
 	// 定位消耗指针
@@ -111,7 +115,7 @@ func (rb *ringBuffer) Fill(ids []uint64) uint64 {
 	}
 
 	// 确定可填充数值
-	fillable := uint64(len(rb.buffer)) - produceCursor - minConsumed
+	fillable := uint64(len(rb.buffer)) - (produceCursor - minConsumed)
 	if fillable > uint64(len(ids)) {
 		fillable = uint64(len(ids))
 	}
