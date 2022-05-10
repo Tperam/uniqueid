@@ -1,10 +1,10 @@
 /*
  * @Author: Tperam
- * @Date: 2022-05-10 17:51:54
- * @LastEditTime: 2022-05-10 18:52:50
+ * @Date: 2022-05-11 00:43:07
+ * @LastEditTime: 2022-05-11 00:47:15
  * @LastEditors: Tperam
  * @Description:
- * @FilePath: \uniqueid\internal\biz\lock_test.go
+ * @FilePath: \uniqueid\internal\biz\disruptor_test.go
  */
 package biz_test
 
@@ -16,11 +16,13 @@ import (
 	"github.com/tperam/uniqueid/internal/biz"
 )
 
-func TestRingBufferLock(t *testing.T) {
-	goNum := 100 * 10000
+func TestDisruptor(t *testing.T) {
+
+	goNum := 100 * 1
 	perGoRange := 1
 	arr := make([]uint64, goNum*perGoRange)
-	rb := biz.NewRingbufferLock()
+	// biz.NewUniqueChanFill()
+	rb := biz.NewRingBuffer(65536, 1024)
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < goNum; i++ {
@@ -39,9 +41,11 @@ func TestRingBufferLock(t *testing.T) {
 		step := 10000
 		for {
 			time.Sleep(10 * time.Millisecond)
-
-			// t.Log(rb.Fill(uint64(startID), step), time.Now().Nanosecond())
-			rb.Fill(uint64(startID), step)
+			ids := make([]uint64, step)
+			for i := 0; i < step; i++ {
+				ids[i] = uint64(startID - step + i)
+			}
+			rb.Fill(ids)
 
 			startID += step
 		}
