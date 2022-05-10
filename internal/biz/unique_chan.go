@@ -1,7 +1,7 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-08 23:55:29
- * @LastEditTime: 2022-05-09 00:11:37
+ * @LastEditTime: 2022-05-10 17:11:52
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\unique_chan.go
@@ -9,7 +9,6 @@
 package biz
 
 import (
-	"context"
 	"sync/atomic"
 
 	"github.com/tperam/uniqueid/internal/dao"
@@ -42,15 +41,20 @@ func NewUniqueChanFill(ud *dao.UniqueDao, idChan chan uint64) *UnqiueChanFill {
 	}
 }
 
-func (ucf *UnqiueChanFill) Fill() error {
-	r, err := ucf.ud.GetSequence(context.TODO(), ucf.bizTag)
-	if err != nil {
-		return err
+func (ucf *UnqiueChanFill) Fill(startID uint64, step int) error {
+	tmp := startID - uint64(step)
+	for i := 0; i < step; i++ {
+		ucf.idCh <- tmp + uint64(i)
 	}
-	for i := r.MaxID - int64(r.Step); i < r.MaxID; i++ {
-		ucf.idCh <- uint64(i)
-	}
-	return err
+	return nil
+	// r, err := ucf.ud.GetSequence(context.TODO(), ucf.bizTag)
+	// if err != nil {
+	// 	return err
+	// }
+	// for i := r.MaxID - int64(r.Step); i < r.MaxID; i++ {
+	// 	ucf.idCh <- uint64(i)
+	// }
+	// return err
 }
 
 type UniqueChanGenerateBiz struct {
@@ -75,7 +79,7 @@ func (ucg *UniqueChanGenerateBiz) GetID() uint64 {
 	if ucg.generateCount-consumeCount < ucg.threshold {
 		if atomic.CompareAndSwapUint64(&ucg.state, 0, 1) {
 			go func() {
-				ucg.ucf.Fill()
+				// ucg.ucf.Fill()
 				atomic.StoreUint64(&ucg.state, 0)
 			}()
 		}
