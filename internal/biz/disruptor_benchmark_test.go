@@ -1,7 +1,7 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-11 22:10:14
- * @LastEditTime: 2022-05-11 23:23:00
+ * @LastEditTime: 2022-05-11 23:27:51
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\disruptor_benchmark_test.go
@@ -52,9 +52,9 @@ func BenchmarkDisruptor262144_1024(b *testing.B) {
 	go func() {
 		startID := 100000
 		step := 10000
+		ids := make([]uint64, step)
 		for {
-			time.Sleep(10 * time.Millisecond)
-			ids := make([]uint64, step)
+
 			for i := 0; i < step; i++ {
 				ids[i] = uint64(startID - step + i)
 			}

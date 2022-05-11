@@ -2,7 +2,7 @@
  * @Author: Tperam
  * @Date: 2022-05-11 00:43:07
 <<<<<<< HEAD
- * @LastEditTime: 2022-05-11 22:05:23
+ * @LastEditTime: 2022-05-11 23:58:44
 =======
  * @LastEditTime: 2022-05-11 16:19:48
 >>>>>>> 115e25d4325947d0f732f012fcd71defdf5e5fe1
@@ -27,7 +27,7 @@ func TestDisruptor(t *testing.T) {
 	perGoRange := 1
 	arr := make([]uint64, goNum*perGoRange)
 	// biz.NewUniqueChanFill()
-	rb := biz.NewRingBuffer(65535, 1024)
+	rb := biz.NewRingBuffer(2048, 1024)
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < goNum; i++ {
