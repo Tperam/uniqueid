@@ -2,7 +2,7 @@
  * @Author: Tperam
  * @Date: 2022-05-10 23:26:23
 <<<<<<< HEAD
- * @LastEditTime: 2022-05-11 22:07:57
+ * @LastEditTime: 2022-05-11 23:18:31
 =======
  * @LastEditTime: 2022-05-11 16:22:17
 >>>>>>> 115e25d4325947d0f732f012fcd71defdf5e5fe1
@@ -42,6 +42,7 @@ type ringBuffer struct {
 	waitQuene     []uint64 // 处理锁
 
 	producerMu sync.Mutex
+	ltProducer []uint64
 }
 
 func tableSizeFor(cap uint64) uint64 {
@@ -78,6 +79,7 @@ func NewRingBuffer(bufferSize, consumerSize uint64) *ringBuffer {
 		consumerMask:   consumerSize - 1,
 		consumerWriter: make([]uint64, consumerSize),
 		waitQuene:      make([]uint64, 0, consumerSize),
+		ltProducer:     make([]uint64, 0, consumerSize),
 	}
 }
 
@@ -123,13 +125,13 @@ func (rb *ringBuffer) Fill(ids []uint64) uint64 {
 	rb.consumerWriterMutex.Lock()
 	consumeCursor := rb.consumeCursor
 	// lt produce arr
-	ltProduce := make([]uint64, 0, len(rb.consumers))
+	ltProduce := rb.ltProducer[:0]
 	for i := range rb.consumerWriter {
 		if rb.consumerWriter[i] == 0 {
 			continue
 		}
 		if rb.consumerWriter[i] < rb.producerCursor {
-			ltProduce = append(ltProduce, rb.consumerWriter[i])
+			rb.ltProducer = append(ltProduce, rb.consumerWriter[i])
 			continue
 		}
 		if rb.consumerWriter[i] < rb.producerCursor {
@@ -162,7 +164,6 @@ func (rb *ringBuffer) Fill(ids []uint64) uint64 {
 	}
 	// 更新生产指针
 	atomic.AddUint64(&rb.producerCursor, fillable)
-
 	rb.producerMu.Unlock()
 
 	// 唤醒等待

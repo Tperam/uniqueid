@@ -1,7 +1,7 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-11 22:12:16
- * @LastEditTime: 2022-05-11 22:54:26
+ * @LastEditTime: 2022-05-11 23:23:27
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\chan_benchmark_test.go
@@ -24,9 +24,8 @@ func BenchmarkChan65536(b *testing.B) {
 	go func() {
 		startID := 100000
 		step := 10000
+		ids := make([]uint64, step)
 		for {
-			time.Sleep(10 * time.Millisecond)
-			ids := make([]uint64, step)
 			for i := 0; i < step; i++ {
 				ids[i] = uint64(startID - step + i)
 			}
@@ -39,8 +38,13 @@ func BenchmarkChan65536(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		go c.GetID()
+		wg.Add(1)
+		go func() {
+			c.GetID()
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 }
 
 func BenchmarkChan262144(b *testing.B) {
