@@ -1,7 +1,7 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-11 00:43:07
- * @LastEditTime: 2022-05-11 01:14:18
+ * @LastEditTime: 2022-05-11 16:19:48
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\disruptor_test.go
@@ -19,7 +19,7 @@ import (
 
 func TestDisruptor(t *testing.T) {
 
-	goNum := 1 * 68000
+	goNum := 1 * 60000
 	perGoRange := 1
 	arr := make([]uint64, goNum*perGoRange)
 	// biz.NewUniqueChanFill()
