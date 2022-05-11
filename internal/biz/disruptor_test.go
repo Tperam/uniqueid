@@ -1,7 +1,7 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-11 00:43:07
- * @LastEditTime: 2022-05-11 01:14:18
+ * @LastEditTime: 2022-05-11 01:16:58
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\disruptor_test.go
@@ -19,11 +19,11 @@ import (
 
 func TestDisruptor(t *testing.T) {
 
-	goNum := 1 * 68000
+	goNum := 1 * 8172
 	perGoRange := 1
 	arr := make([]uint64, goNum*perGoRange)
 	// biz.NewUniqueChanFill()
-	rb := biz.NewRingBuffer(65536, 1024)
+	rb := biz.NewRingBuffer(4096, 1024)
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < goNum; i++ {

@@ -1,7 +1,7 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-10 23:26:23
- * @LastEditTime: 2022-05-11 01:10:48
+ * @LastEditTime: 2022-05-11 21:17:14
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\disruptor.go
@@ -9,13 +9,13 @@
 package biz
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 )
 
 type consume struct {
 	mu        sync.Mutex
-	consumed  uint64
 	consuming uint64
 	sign      chan struct{}
 }
@@ -79,6 +79,7 @@ func (rb *ringBuffer) GetID() uint64 {
 	rb.consumers[consumerID].mu.Lock()
 
 	consumeCursor := atomic.AddUint64(&rb.consumeCursor, 1)
+	rb.consumers[consumerID].consuming = consumeCursor
 	// doslow
 	if consumeCursor >= rb.producerCursor {
 
@@ -87,7 +88,6 @@ func (rb *ringBuffer) GetID() uint64 {
 		if consumeCursor >= rb.producerCursor {
 			// 添加到等待队列
 			rb.waitQuene = append(rb.waitQuene, consumerID)
-			rb.consumers[consumerID].consuming = consumeCursor
 			rb.waitQueneLock.Unlock()
 			// 尝试阻塞
 			<-rb.consumers[consumerID].sign
@@ -97,7 +97,6 @@ func (rb *ringBuffer) GetID() uint64 {
 
 	}
 	result := rb.buffer[consumeCursor&rb.bufferMask]
-	rb.consumers[consumerID].consumed = consumeCursor
 	rb.consumers[consumerID].mu.Unlock()
 	return result
 }
@@ -107,15 +106,16 @@ func (rb *ringBuffer) Fill(ids []uint64) uint64 {
 	rb.producerMu.Lock()
 	// 定位消耗指针
 	produceCursor := rb.producerCursor
-	minConsumed := rb.consumers[0].consumed
+	minConsumed := rb.consumers[0].consuming
 	for i := range rb.consumers {
-		if rb.consumers[i].consumed < minConsumed {
-			minConsumed = rb.consumers[i].consumed
+		if rb.consumers[i].consuming < minConsumed {
+			minConsumed = rb.consumers[i].consuming
 		}
 	}
 
 	// 确定可填充数值
 	fillable := uint64(len(rb.buffer)) - (produceCursor - minConsumed)
+	fmt.Println(uint64(len(rb.buffer)), produceCursor, minConsumed)
 	if fillable > uint64(len(ids)) {
 		fillable = uint64(len(ids))
 	}
