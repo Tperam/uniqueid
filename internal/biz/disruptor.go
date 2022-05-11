@@ -2,7 +2,7 @@
  * @Author: Tperam
  * @Date: 2022-05-10 23:26:23
 <<<<<<< HEAD
- * @LastEditTime: 2022-05-11 21:19:02
+ * @LastEditTime: 2022-05-11 22:07:57
 =======
  * @LastEditTime: 2022-05-11 16:22:17
 >>>>>>> 115e25d4325947d0f732f012fcd71defdf5e5fe1
@@ -18,16 +18,19 @@ import (
 )
 
 type consume struct {
-	mu        sync.Mutex
-	consuming uint64
-	sign      chan struct{}
+	mu sync.Mutex
+
+	sign chan struct{}
 }
 
 type ringBuffer struct {
-	buffer       []uint64
-	bufferMask   uint64
-	consumers    []*consume
-	consumerMask uint64
+	buffer     []uint64
+	bufferMask uint64
+
+	consumers           []*consume
+	consumerMask        uint64
+	consumerWriter      []uint64
+	consumerWriterMutex sync.RWMutex
 
 	// 自增ID，确认落入哪个consumer
 	increment uint64
@@ -55,6 +58,7 @@ func tableSizeFor(cap uint64) uint64 {
 		return n + 1
 	}
 }
+
 func NewRingBuffer(bufferSize, consumerSize uint64) *ringBuffer {
 	bufferSize = tableSizeFor(bufferSize)
 	consumerSize = tableSizeFor(consumerSize)
@@ -68,11 +72,12 @@ func NewRingBuffer(bufferSize, consumerSize uint64) *ringBuffer {
 		consumers[i].sign = make(chan struct{}, 1)
 	}
 	return &ringBuffer{
-		buffer:       make([]uint64, bufferSize),
-		bufferMask:   bufferSize - 1,
-		consumers:    consumers,
-		consumerMask: consumerSize - 1,
-		waitQuene:    make([]uint64, 0, consumerSize),
+		buffer:         make([]uint64, bufferSize),
+		bufferMask:     bufferSize - 1,
+		consumers:      consumers,
+		consumerMask:   consumerSize - 1,
+		consumerWriter: make([]uint64, consumerSize),
+		waitQuene:      make([]uint64, 0, consumerSize),
 	}
 }
 
@@ -81,8 +86,10 @@ func (rb *ringBuffer) GetID() uint64 {
 
 	rb.consumers[consumerID].mu.Lock()
 
+	rb.consumerWriterMutex.RLock()
 	consumeCursor := atomic.AddUint64(&rb.consumeCursor, 1)
-	rb.consumers[consumerID].consuming = consumeCursor
+	rb.consumerWriter[consumerID] = consumeCursor
+	rb.consumerWriterMutex.RUnlock()
 	// doslow
 	if consumeCursor >= rb.producerCursor {
 
@@ -100,7 +107,10 @@ func (rb *ringBuffer) GetID() uint64 {
 
 	}
 	result := rb.buffer[consumeCursor&rb.bufferMask]
-	rb.consumers[consumerID].consuming = 0
+
+	rb.consumerWriterMutex.RLock()
+	rb.consumerWriter[consumerID] = 0
+	rb.consumerWriterMutex.RUnlock()
 	rb.consumers[consumerID].mu.Unlock()
 	return result
 }
@@ -108,41 +118,62 @@ func (rb *ringBuffer) GetID() uint64 {
 // 返回填充长度
 func (rb *ringBuffer) Fill(ids []uint64) uint64 {
 	rb.producerMu.Lock()
-	// 定位消耗指针
-	// produceCursor := rb.producerCursor
-	minConsumed := rb.consumers[0].consuming
-	for i := range rb.consumers {
-		if rb.consumers[i].consuming < minConsumed {
-			minConsumed = rb.consumers[i].consuming
+
+	// 查看占用指针
+	rb.consumerWriterMutex.Lock()
+	consumeCursor := rb.consumeCursor
+	// lt produce arr
+	ltProduce := make([]uint64, 0, len(rb.consumers))
+	for i := range rb.consumerWriter {
+		if rb.consumerWriter[i] == 0 {
+			continue
+		}
+		if rb.consumerWriter[i] < rb.producerCursor {
+			ltProduce = append(ltProduce, rb.consumerWriter[i])
+			continue
+		}
+		if rb.consumerWriter[i] < rb.producerCursor {
+			ltProduce = append(ltProduce, rb.consumerWriter[i])
+			continue
 		}
 	}
+	rb.consumerWriterMutex.Unlock()
 
-	// 确定可填充数值
-	fillable := uint64(len(rb.buffer)) - (rb.producerCursor - minConsumed)
-	if rb.producerCursor < minConsumed {
-		fillable = uint64(len(rb.buffer))
+	// 计算可填充容量
+	fillable := uint64(len(rb.buffer)) - (rb.producerCursor - consumeCursor) - uint64(len(ltProduce))
+	if rb.producerCursor < consumeCursor {
+		fillable = uint64(len(rb.buffer) - len(ltProduce))
 	}
 
 	if fillable > uint64(len(ids)) {
 		fillable = uint64(len(ids))
 	}
-	// fmt.Println(fillable, len(rb.buffer), rb.producerCursor, minConsumed, (rb.producerCursor - minConsumed))
+
 	// 填充
 	for i := uint64(0); i < fillable; i++ {
+		for j := range ltProduce {
+			if ltProduce[j]&rb.bufferMask == (rb.producerCursor+i)&rb.bufferMask {
+				ltProduce = append(ltProduce[:j], ltProduce[j+1:]...)
+				i++
+				break
+			}
+		}
 		rb.buffer[(rb.producerCursor+i)&rb.bufferMask] = ids[i]
 	}
+	// 更新生产指针
 	atomic.AddUint64(&rb.producerCursor, fillable)
 
 	rb.producerMu.Unlock()
-	// 解锁
+
+	// 唤醒等待
 	rb.waitQueneLock.Lock()
 	for i := range rb.waitQuene {
-		if rb.consumers[rb.waitQuene[i]].consuming < rb.producerCursor {
+		if rb.consumerWriter[rb.waitQuene[i]] < rb.producerCursor {
 			rb.consumers[rb.waitQuene[i]].sign <- struct{}{}
 		}
 	}
-
 	rb.waitQuene = rb.waitQuene[:0]
 	rb.waitQueneLock.Unlock()
+
 	return fillable
 }

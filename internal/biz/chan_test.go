@@ -1,7 +1,7 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-10 17:01:52
- * @LastEditTime: 2022-05-11 01:11:43
+ * @LastEditTime: 2022-05-11 22:14:52
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\chan_test.go
@@ -18,7 +18,7 @@ import (
 
 func TestChan(t *testing.T) {
 
-	goNum := 10 * 10000
+	goNum := 100 * 10000
 	perGoRange := 1
 	arr := make([]uint64, goNum*perGoRange)
 	// biz.NewUniqueChanFill()
@@ -43,13 +43,16 @@ func TestChan(t *testing.T) {
 		step := 10000
 		for {
 			time.Sleep(10 * time.Millisecond)
-
-			// t.Log(rb.Fill(uint64(startID), step), time.Now().Nanosecond())
-			u.Fill(uint64(startID), step)
+			ids := make([]uint64, step)
+			for i := 0; i < step; i++ {
+				ids[i] = uint64(startID - step + i)
+			}
+			u.Fill(ids)
 
 			startID += step
 		}
 	}()
+
 	wg.Wait()
 
 	// 验证是否重复

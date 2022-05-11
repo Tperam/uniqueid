@@ -1,10 +1,10 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-08 23:55:29
- * @LastEditTime: 2022-05-10 17:11:52
+ * @LastEditTime: 2022-05-11 22:13:42
  * @LastEditors: Tperam
  * @Description:
- * @FilePath: \uniqueid\internal\biz\unique_chan.go
+ * @FilePath: \uniqueid\internal\biz\chan.go
  */
 package biz
 
@@ -41,10 +41,9 @@ func NewUniqueChanFill(ud *dao.UniqueDao, idChan chan uint64) *UnqiueChanFill {
 	}
 }
 
-func (ucf *UnqiueChanFill) Fill(startID uint64, step int) error {
-	tmp := startID - uint64(step)
-	for i := 0; i < step; i++ {
-		ucf.idCh <- tmp + uint64(i)
+func (ucf *UnqiueChanFill) Fill(ids []uint64) error {
+	for i := 0; i < len(ids); i++ {
+		ucf.idCh <- ids[i]
 	}
 	return nil
 	// r, err := ucf.ud.GetSequence(context.TODO(), ucf.bizTag)
