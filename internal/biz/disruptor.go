@@ -9,13 +9,14 @@
 package biz
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type consume struct {
-	mu sync.Mutex
-
+	mu   sync.Mutex
 	sign chan struct{}
 }
 
@@ -80,14 +81,14 @@ func NewRingBuffer(bufferSize, consumerSize uint64) *ringBuffer {
 }
 
 func (rb *ringBuffer) GetID() uint64 {
-	consumerID := atomic.AddUint64(&rb.increment, 1) & rb.consumerMask
+	incr := atomic.AddUint64(&rb.increment, 1)
+	consumerID := incr & rb.consumerMask
 
 	rb.consumers[consumerID].mu.Lock()
 
-	rb.consumerWriterMutex.RLock()
 	consumeCursor := atomic.AddUint64(&rb.consumeCursor, 1)
 	rb.consumerWriter[consumerID] = consumeCursor
-	rb.consumerWriterMutex.RUnlock()
+	fmt.Println("consumerID ", consumerID, "消费指针", consumeCursor, "生产指针", rb.producerCursor, "incr_id", incr)
 	// doslow
 	if consumeCursor >= rb.producerCursor {
 
@@ -98,7 +99,9 @@ func (rb *ringBuffer) GetID() uint64 {
 			rb.waitQuene = append(rb.waitQuene, consumerID)
 			rb.waitQueneLock.Unlock()
 			// 尝试阻塞
+			fmt.Println("consumerID", consumerID, "阻塞", consumeCursor)
 			<-rb.consumers[consumerID].sign
+			fmt.Println("consumerID", consumerID, "解除阻塞", consumeCursor)
 		} else {
 			rb.waitQueneLock.Unlock()
 		}
@@ -106,58 +109,62 @@ func (rb *ringBuffer) GetID() uint64 {
 	}
 	result := rb.buffer[consumeCursor&rb.bufferMask]
 
-	rb.consumerWriterMutex.RLock()
-	rb.consumerWriter[consumerID] = 0
-	rb.consumerWriterMutex.RUnlock()
 	rb.consumers[consumerID].mu.Unlock()
+	fmt.Println("consumerID ", consumerID, "消费完成,指针", consumeCursor, "incr_id", incr)
 	return result
 }
 
 // 返回填充长度
 func (rb *ringBuffer) Fill(ids []uint64) uint64 {
+	if len(ids) == 0 {
+		return 0
+	}
 	rb.producerMu.Lock()
 
-	// 查看占用指针
-	rb.consumerWriterMutex.Lock()
-	consumeCursor := rb.consumeCursor
-	// lt produce arr
-	ltProduce := rb.ltProducer[:0]
-	for i := range rb.consumerWriter {
-		if rb.consumerWriter[i] == 0 {
-			continue
-		}
-		if rb.consumerWriter[i] < rb.producerCursor {
-			rb.ltProducer = append(ltProduce, rb.consumerWriter[i])
-			continue
-		}
-		if rb.consumerWriter[i] < rb.producerCursor {
-			ltProduce = append(ltProduce, rb.consumerWriter[i])
-			continue
-		}
-	}
-	rb.consumerWriterMutex.Unlock()
+	// 查找最小指针
+	minConsumeCursor := min(rb.consumerWriter)
 
 	// 计算可填充容量
-	fillable := uint64(len(rb.buffer)) - (rb.producerCursor - consumeCursor) - uint64(len(ltProduce))
-	if rb.producerCursor < consumeCursor {
-		fillable = uint64(len(rb.buffer) - len(ltProduce))
+	fillable := uint64(len(rb.buffer)) - (rb.producerCursor - minConsumeCursor)
+	if rb.producerCursor < minConsumeCursor {
+		fillable = uint64(len(rb.buffer))
 	}
 
 	if fillable > uint64(len(ids)) {
 		fillable = uint64(len(ids))
 	}
 
-	// 填充
-	// 此版本此处会产生Bug
-	// 当前是判断正在消费，则跳过其进行填充，但后续并没有对跳过填充部分进行二次填充，也没让其忽略
-	for i := uint64(0); i < fillable; i++ {
-		for j := range ltProduce {
-			if ltProduce[j]&rb.bufferMask == (rb.producerCursor+i)&rb.bufferMask {
-				ltProduce = append(ltProduce[:j], ltProduce[j+1:]...)
-				i++
-				break
-			}
+	// 如果等于0，则代表最小消费指针为极低，影响到循环填充
+	// 此时则等待最小消费指针进行更新
+	if fillable == 0 {
+		// 重新获取
+		tmp := min(rb.consumerWriter)
+		// 自旋100次
+		for i := 0; i < 100 && tmp == minConsumeCursor; i++ {
+			tmp = min(rb.consumerWriter)
 		}
+		// 尝试睡眠等待
+		sleepTime := 1
+		for i := 0; tmp == minConsumeCursor; i++ {
+			if i == 1000 {
+				sleepTime++
+			}
+			tmp = min(rb.consumerWriter)
+			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+			fmt.Println(tmp)
+		}
+		minConsumeCursor = tmp
+		if rb.producerCursor < minConsumeCursor {
+			fillable = uint64(len(rb.buffer))
+		}
+
+		if fillable > uint64(len(ids)) {
+			fillable = uint64(len(ids))
+		}
+	}
+
+	// 填充
+	for i := uint64(0); i < fillable; i++ {
 		rb.buffer[(rb.producerCursor+i)&rb.bufferMask] = ids[i]
 	}
 	// 更新生产指针
@@ -175,4 +182,17 @@ func (rb *ringBuffer) Fill(ids []uint64) uint64 {
 	rb.waitQueneLock.Unlock()
 
 	return fillable
+}
+
+func min(arr []uint64) uint64 {
+	if len(arr) == 0 {
+		return 0
+	}
+	minConsumeCursor := arr[0]
+	for i := 1; i < len(arr); i++ {
+		if minConsumeCursor > arr[i] {
+			minConsumeCursor = arr[i]
+		}
+	}
+	return minConsumeCursor
 }
