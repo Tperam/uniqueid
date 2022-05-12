@@ -1,15 +1,11 @@
 /*
  * @Author: Tperam
  * @Date: 2022-05-10 23:26:23
-<<<<<<< HEAD
- * @LastEditTime: 2022-05-11 23:18:31
-=======
- * @LastEditTime: 2022-05-11 16:22:17
->>>>>>> 115e25d4325947d0f732f012fcd71defdf5e5fe1
+ * @LastEditTime: 2022-05-12 00:22:47
  * @LastEditors: Tperam
  * @Description:
  * @FilePath: \uniqueid\internal\biz\disruptor.go
-*/
+ */
 package biz
 
 import (
@@ -152,6 +148,8 @@ func (rb *ringBuffer) Fill(ids []uint64) uint64 {
 	}
 
 	// 填充
+	// 此版本此处会产生Bug
+	// 当前是判断正在消费，则跳过其进行填充，但后续并没有对跳过填充部分进行二次填充，也没让其忽略
 	for i := uint64(0); i < fillable; i++ {
 		for j := range ltProduce {
 			if ltProduce[j]&rb.bufferMask == (rb.producerCursor+i)&rb.bufferMask {
