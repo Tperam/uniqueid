@@ -23,7 +23,7 @@ func TestDisruptor(t *testing.T) {
 	perGoRange := 1
 	arr := make([]uint64, goNum*perGoRange)
 	// biz.NewUniqueChanFill()
-	rb := biz.NewRingBuffer(16, 4)
+	rb := biz.NewDisruptor(16, 4)
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < goNum; i++ {

@@ -19,7 +19,7 @@ import (
 var wg = &sync.WaitGroup{}
 
 func BenchmarkDisruptor65536_1024(b *testing.B) {
-	rb := biz.NewRingBuffer(65536, 1024)
+	rb := biz.NewDisruptor(65536, 1024)
 
 	go func() {
 		startID := 100000
@@ -47,7 +47,7 @@ func BenchmarkDisruptor65536_1024(b *testing.B) {
 	wg.Wait()
 }
 func BenchmarkDisruptor262144_1024(b *testing.B) {
-	rb := biz.NewRingBuffer(262144, 1024)
+	rb := biz.NewDisruptor(262144, 1024)
 
 	go func() {
 		startID := 100000
@@ -77,7 +77,7 @@ func BenchmarkDisruptor262144_1024(b *testing.B) {
 }
 
 func BenchmarkDisruptor1024_2(b *testing.B) {
-	rb := biz.NewRingBuffer(1024, 2)
+	rb := biz.NewDisruptor(1024, 2)
 
 	go func() {
 		startID := 100000

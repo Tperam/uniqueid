@@ -20,7 +20,7 @@ type consume struct {
 	sign chan struct{}
 }
 
-type ringBuffer struct {
+type disruptor struct {
 	buffer     []uint64
 	bufferMask uint64
 
@@ -57,7 +57,7 @@ func tableSizeFor(cap uint64) uint64 {
 	}
 }
 
-func NewRingBuffer(bufferSize, consumerSize uint64) *ringBuffer {
+func NewDisruptor(bufferSize, consumerSize uint64) *disruptor {
 	bufferSize = tableSizeFor(bufferSize)
 	consumerSize = tableSizeFor(consumerSize)
 	if consumerSize > bufferSize {
@@ -69,7 +69,7 @@ func NewRingBuffer(bufferSize, consumerSize uint64) *ringBuffer {
 		consumers[i] = &tmpConsumer[i]
 		consumers[i].sign = make(chan struct{}, 1)
 	}
-	return &ringBuffer{
+	return &disruptor{
 		buffer:         make([]uint64, bufferSize),
 		bufferMask:     bufferSize - 1,
 		consumers:      consumers,
@@ -80,7 +80,7 @@ func NewRingBuffer(bufferSize, consumerSize uint64) *ringBuffer {
 	}
 }
 
-func (rb *ringBuffer) GetID() uint64 {
+func (rb *disruptor) GetID() uint64 {
 	incr := atomic.AddUint64(&rb.increment, 1)
 	consumerID := incr & rb.consumerMask
 
@@ -115,7 +115,7 @@ func (rb *ringBuffer) GetID() uint64 {
 }
 
 // 返回填充长度
-func (rb *ringBuffer) Fill(ids []uint64) uint64 {
+func (rb *disruptor) Fill(ids []uint64) uint64 {
 	if len(ids) == 0 {
 		return 0
 	}
