@@ -12,8 +12,8 @@ import "time"
 
 type UnqiueID struct {
 	BizTag     string    `json:"biz_tag"`
-	MaxID      int64     `json:"max_id"`
-	Step       int32     `json:"step"`
+	MaxID      uint64    `json:"max_id"`
+	Step       int       `json:"step"`
 	Desc       string    `json:"desc"`
 	UpdateTime time.Time `json:"update_time"`
 }

@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 )
 
-type ringBuffer struct {
+type RingBuffer struct {
 	buffer        []uint64
 	mask          uint64
 	consumeCursor uint64
@@ -14,28 +14,40 @@ type ringBuffer struct {
 	wait          chan struct{}
 	waitMu        sync.Mutex
 	waitSign      uint64
-
-	mu     sync.Mutex
-	fillMu sync.Mutex
+	filled        bool
+	mu            sync.Mutex
+	fillMu        sync.Mutex
 }
 
-func NewRingBuffer(bufferSize uint64, fillSign, wait chan struct{}) *ringBuffer {
+// NewRingBuffer
+// @Description: New RingBuffer
+// @param bufferSize buffer size
+// @param fillSign The fillSign will get sign When need fill buffer
+// @param wait  If filling is not timely, the wait will get sign
+// @return *RingBuffer
+func NewRingBuffer(bufferSize uint64, fillSign, wait chan struct{}) *RingBuffer {
 	if bufferSize == 0 {
 		bufferSize = 1024
 	}
 
 	bufferSize = tableSizeFor(bufferSize)
-	return &ringBuffer{
+	return &RingBuffer{
 		buffer:   make([]uint64, bufferSize),
 		mask:     bufferSize - 1,
 		fillSign: fillSign,
+		filled:   true,
 		wait:     wait,
 	}
 }
 
-func (rb *ringBuffer) GetID() uint64 {
+func (rb *RingBuffer) GetID() uint64 {
 	rb.mu.Lock()
 	rb.consumeCursor++
+
+	if rb.produceCursor-rb.consumeCursor <= uint64(len(rb.buffer)/10) && rb.filled {
+		rb.filled = false
+		<-rb.fillSign
+	}
 
 	if rb.consumeCursor >= rb.produceCursor {
 		// 通知更新
@@ -45,6 +57,7 @@ func (rb *ringBuffer) GetID() uint64 {
 		if rb.consumeCursor >= rb.produceCursor {
 			rb.waitSign = 1
 			rb.waitMu.Unlock()
+
 			<-rb.wait
 		} else {
 			rb.waitMu.Unlock()
@@ -55,25 +68,27 @@ func (rb *ringBuffer) GetID() uint64 {
 	return result
 }
 
-func (rb *ringBuffer) Fill(tasks []uint64) int {
+func (rb *RingBuffer) Fill(tasks []uint64) int {
 	if len(tasks) == 0 {
 		return 0
 	}
 	rb.fillMu.Lock()
 	//
-	fillable := uint64(len(rb.buffer)) - (rb.produceCursor - rb.consumeCursor)
+	fillable := len(rb.buffer) - int(rb.produceCursor-rb.consumeCursor)
 	if rb.produceCursor < rb.consumeCursor {
-		fillable = uint64(len(rb.buffer))
+		fillable = len(rb.buffer)
 	}
-	if fillable > uint64(len(tasks)) {
-		fillable = uint64(len(tasks))
+	if fillable > len(tasks) {
+		fillable = len(tasks)
 	}
 
 	// 填充
-	for i := uint64(0); i < fillable; i++ {
-		rb.buffer[(rb.produceCursor)&rb.mask] = tasks[i]
-		atomic.AddUint64(&rb.produceCursor, 1)
+	for i := 0; i < fillable; i++ {
+		rb.buffer[(rb.produceCursor+uint64(i))&rb.mask] = tasks[i]
+
 	}
+	rb.filled = true
+	rb.produceCursor += uint64(fillable)
 
 	rb.fillMu.Unlock()
 	// 通知，取消阻塞
@@ -83,7 +98,7 @@ func (rb *ringBuffer) Fill(tasks []uint64) int {
 	}
 	rb.waitMu.Unlock()
 
-	return 0
+	return fillable
 }
 
 func tableSizeFor(cap uint64) uint64 {
