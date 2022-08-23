@@ -17,8 +17,9 @@ CREATE TABLE `unique_id` (
     biz_tag VARCHAR(120) NOT NULL,
     max_id BIGINT UNSIGNED NOT NULL,
     step INT UNSIGNED NOT NULL,
-    desc VARCHAR(256),
-    update_time timestamp,
+    `desc` VARCHAR(255) NOT NULL DEFAULT '',
+    start_time timestamp DEFAULT CURRENT_TIMESTAMP,
+    update_time timestamp DEFAULT CURRENT_TIMESTAMP,
 	PRIMARY KEY(`biz_tag`)
 );
 ```

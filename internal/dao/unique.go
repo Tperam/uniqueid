@@ -10,14 +10,18 @@ package dao
 
 import (
 	"context"
-	"database/sql"
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/tperam/uniqueid/internal/model"
 )
 
 type UniqueDao struct {
-	db *sql.DB
+	db *gorm.DB
+}
+
+func NewUniqueDao(db *gorm.DB) *UniqueDao {
+	return &UniqueDao{db: db}
 }
 
 /**
@@ -28,19 +32,19 @@ type UniqueDao struct {
  * @return {*}
  */
 func (ud *UniqueDao) GetSequence(ctx context.Context, bizTag string) (seq *model.UnqiueID, err error) {
-	tx, err := ud.db.Begin()
-	if err != nil {
-		return nil, err
-	}
-	_, err = tx.ExecContext(ctx, "UPDATE unique_id SET max_id = max_id + step AND update_time = ? WHERE biz_tag = ?", time.Now(), bizTag)
-	if err != nil {
-		return nil, err
-	}
 
-	row := ud.db.QueryRowContext(ctx, "SELECT biz_tag,max_id,step,desc,update_time FROM unique_id WHERE biz_tag = ?", bizTag)
+	err = ud.db.Transaction(func(tx *gorm.DB) error {
+		if err != nil {
+			return err
+		}
+		err = tx.WithContext(ctx).Exec("UPDATE unique_id SET max_id = max_id + step, update_time = ? WHERE biz_tag = ?", time.Now(), bizTag).Error
+		if err != nil {
+			return err
+		}
 
-	seq = &model.UnqiueID{}
-	err = row.Scan(&seq.BizTag, &seq.MaxID, &seq.Step, &seq.Desc, &seq.UpdateTime)
+		return tx.WithContext(ctx).Table("unique_id").Where("biz_tag=?", bizTag).Find(&seq).Error
+
+	})
 
 	return seq, err
 }

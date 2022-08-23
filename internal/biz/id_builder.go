@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/tperam/uniqueid/internal/biz/ringbuffer"
 	"github.com/tperam/uniqueid/internal/dao"
@@ -12,12 +13,12 @@ import (
 type IDBuilderBiz struct {
 	rb       *ringbuffer.RingBuffer
 	ud       *dao.UniqueDao
-	log      *zerolog.Logger
+	log      zerolog.Logger
 	fillPool *sync.Pool
 	bizTag   string
 }
 
-func NewGenerationBiz(log *zerolog.Logger, ud *dao.UniqueDao, bizTag string) *IDBuilderBiz {
+func NewGenerationBiz(log zerolog.Logger, ud *dao.UniqueDao, bizTag string) *IDBuilderBiz {
 	fillSign := make(chan struct{}, 1)
 	wait := make(chan struct{}, 1)
 	rb := ringbuffer.NewRingBuffer(10240, fillSign, wait)
@@ -30,7 +31,6 @@ func NewGenerationBiz(log *zerolog.Logger, ud *dao.UniqueDao, bizTag string) *ID
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				// printLog
 				log.Error().Err(err.(error)).Str("bizTag", bizTag).Msg("generation recover: err ")
 			}
 		}()
@@ -53,8 +53,9 @@ func (g *IDBuilderBiz) GetID() uint64 {
 }
 
 func (g *IDBuilderBiz) fill(task []uint64) ([]uint64, error) {
+	// 开始填充
 	// 如果有 70% 容量， 则不进行更新
-	if len(task) != 0 {
+	if len(task) == 0 {
 		ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
 		seq, err := g.ud.GetSequence(ctx, g.bizTag)
 		if err != nil {
@@ -70,10 +71,13 @@ func (g *IDBuilderBiz) fill(task []uint64) ([]uint64, error) {
 		}
 
 		id := seq.MaxID - uint64(seq.Step)
+		fmt.Println(id, len(task))
+
 		for i := len(task); i < cap(task) && i < seq.Step; i++ {
 			task = append(task, id+uint64(i))
 		}
 	}
+
 	index := g.rb.Fill(task)
 	copy(task[0:], task[index:])
 	return task[:len(task)-index], nil

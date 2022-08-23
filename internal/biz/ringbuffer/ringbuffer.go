@@ -42,12 +42,12 @@ func NewRingBuffer(bufferSize uint64, fillSign, wait chan struct{}) *RingBuffer 
 
 func (rb *RingBuffer) GetID() uint64 {
 	rb.mu.Lock()
-	rb.consumeCursor++
 
 	if rb.produceCursor-rb.consumeCursor <= uint64(len(rb.buffer)/10) && rb.filled {
 		rb.filled = false
-		<-rb.fillSign
+		rb.fillSign <- struct{}{}
 	}
+	rb.consumeCursor++
 
 	if rb.consumeCursor >= rb.produceCursor {
 		// 通知更新
