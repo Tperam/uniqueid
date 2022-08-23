@@ -3,7 +3,6 @@ package biz_test
 import (
 	"github.com/rs/zerolog/log"
 	"github.com/tperam/uniqueid/internal/biz"
-	"github.com/tperam/uniqueid/internal/dao"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"testing"
@@ -19,8 +18,7 @@ func TestIDBuilder(t *testing.T) {
 		panic(err)
 	}
 
-	ud := dao.NewUniqueDao(db)
-	gb := biz.NewGenerationBiz(log.Logger, ud, "test1")
+	gb := biz.NewIDBuidlerBiz(log.Logger, db, "test1")
 
 	//length := 100000
 	//result := make([]uint64, length)
@@ -46,8 +44,7 @@ func BenchmarkIDBuilder(b *testing.B) {
 		panic(err)
 	}
 
-	ud := dao.NewUniqueDao(db)
-	gb := biz.NewGenerationBiz(log.Logger, ud, "test1")
+	gb := biz.NewIDBuidlerBiz(log.Logger, db, "test1")
 
 	result := make([]uint64, b.N)
 	b.ResetTimer()

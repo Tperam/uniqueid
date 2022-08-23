@@ -1,4 +1,4 @@
-package gin
+package ginserver
 
 import (
 	"github.com/gin-gonic/gin"
@@ -6,9 +6,14 @@ import (
 	"net/http"
 )
 
-func (ga *GinAdapt) PostID(builder *biz.IDBuilderBiz) func(c *gin.Context) {
+func (ga *GinAdapt) PostID(builder *biz.IDBuilderBizs) func(c *gin.Context) {
 
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, builder.GetID())
+
+		biz := c.Query("biz")
+		if biz == "" {
+			c.JSON(http.StatusBadRequest, 0)
+		}
+		c.JSON(http.StatusOK, builder.GetID(biz))
 	}
 }

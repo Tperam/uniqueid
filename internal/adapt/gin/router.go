@@ -1,4 +1,4 @@
-package gin
+package ginserver
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 type GinAdapt struct {
 }
 
-func (ga *GinAdapt) NewRouter(ctx context.Context, addr string, builder *biz.IDBuilderBiz, log zerolog.Logger) {
+func (ga *GinAdapt) NewRouter(ctx context.Context, addr string, builder *biz.IDBuilderBizs, log zerolog.Logger) {
 	r := gin.Default()
 
 	r.POST("/id", ga.PostID(builder))

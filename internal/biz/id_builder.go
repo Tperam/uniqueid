@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/tperam/uniqueid/internal/biz/ringbuffer"
 	"github.com/tperam/uniqueid/internal/dao"
+	"gorm.io/gorm"
 	"sync"
 	"time"
 )
@@ -18,7 +19,8 @@ type IDBuilderBiz struct {
 	bizTag   string
 }
 
-func NewGenerationBiz(log zerolog.Logger, ud *dao.UniqueDao, bizTag string) *IDBuilderBiz {
+func NewIDBuidlerBiz(log zerolog.Logger, db *gorm.DB, bizTag string) *IDBuilderBiz {
+	ud := dao.NewUniqueDao(db)
 	fillSign := make(chan struct{}, 1)
 	wait := make(chan struct{}, 1)
 	rb := ringbuffer.NewRingBuffer(10240, fillSign, wait)
