@@ -49,7 +49,8 @@ func (rb *RingBuffer) GetID() uint64 {
 	}
 	rb.consumeCursor++
 
-	if rb.consumeCursor >= rb.produceCursor {
+	// 由于有锁，此处只会出现小于 或等于，我们只处理等于
+	if rb.consumeCursor == rb.produceCursor {
 		// 通知更新
 		//rb.fillSign <- struct{}{}
 
@@ -88,6 +89,12 @@ func (rb *RingBuffer) Fill(tasks []uint64) int {
 
 	}
 	rb.filled = true
+
+	// 越界
+	if rb.produceCursor+uint64(fillable) < rb.produceCursor {
+		rb.produceCursor = rb.produceCursor & rb.mask
+		rb.consumeCursor = rb.consumeCursor & rb.mask
+	}
 	rb.produceCursor += uint64(fillable)
 
 	rb.fillMu.Unlock()
