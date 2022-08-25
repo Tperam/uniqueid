@@ -47,8 +47,6 @@ func (rb *RingBuffer) GetID() uint64 {
 		rb.filled = false
 		rb.fillSign <- struct{}{}
 	}
-	rb.consumeCursor++
-
 	// 由于有锁，此处只会出现小于 或等于，我们只处理等于
 	if rb.consumeCursor == rb.produceCursor {
 		// 通知更新
@@ -64,7 +62,9 @@ func (rb *RingBuffer) GetID() uint64 {
 			rb.waitMu.Unlock()
 		}
 	}
+
 	result := rb.buffer[rb.consumeCursor&rb.mask]
+	rb.consumeCursor++
 	rb.mu.Unlock()
 	return result
 }

@@ -24,7 +24,6 @@ func (m *IDBuilderBizs) GetID(bizTag string) uint64 {
 	m.rwLock.RUnlock()
 
 	if ok {
-
 		return v.GetID()
 	}
 
@@ -37,6 +36,7 @@ func (m *IDBuilderBizs) addNewBuilder(bizTag string) *IDBuilderBiz {
 	defer m.rwLock.Unlock()
 	v, ok := m.builderMap[bizTag]
 	if !ok {
+		m.logger.Debug().Str("biz", bizTag).Msg("init id builder")
 		v = NewIDBuidlerBiz(m.logger, m.db, bizTag)
 		m.builderMap[bizTag] = v
 	}

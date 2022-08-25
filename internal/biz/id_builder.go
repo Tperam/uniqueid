@@ -2,7 +2,6 @@ package biz
 
 import (
 	"context"
-	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/tperam/uniqueid/internal/biz/ringbuffer"
 	"github.com/tperam/uniqueid/internal/dao"
@@ -56,9 +55,9 @@ func (g *IDBuilderBiz) GetID() uint64 {
 
 func (g *IDBuilderBiz) fill(task []uint64) ([]uint64, error) {
 	// 开始填充
-	// 如果有 70% 容量， 则不进行更新
 	if len(task) == 0 {
-		ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
 		seq, err := g.ud.GetSequence(ctx, g.bizTag)
 		if err != nil {
 			return task, err
@@ -66,14 +65,11 @@ func (g *IDBuilderBiz) fill(task []uint64) ([]uint64, error) {
 
 		if cap(task) < seq.Step {
 
-			new := make([]uint64, len(task), seq.Step)
-			copy(new, task)
-			task = new
+			task = make([]uint64, 0, seq.Step)
 
 		}
 
 		id := seq.MaxID - uint64(seq.Step)
-		fmt.Println(id, len(task))
 
 		for i := len(task); i < cap(task) && i < seq.Step; i++ {
 			task = append(task, id+uint64(i))
@@ -81,6 +77,6 @@ func (g *IDBuilderBiz) fill(task []uint64) ([]uint64, error) {
 	}
 
 	index := g.rb.Fill(task)
-	copy(task[0:], task[index:])
+	copy(task, task[index:])
 	return task[:len(task)-index], nil
 }

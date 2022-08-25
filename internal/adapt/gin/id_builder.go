@@ -10,10 +10,15 @@ func (ga *GinAdapt) PostID(builder *biz.IDBuilderBizs) func(c *gin.Context) {
 
 	return func(c *gin.Context) {
 
-		biz := c.Query("biz")
-		if biz == "" {
+		bizTag := c.Query("biz")
+		ga.logger.Debug().Str("biz", bizTag).Msg("PostID")
+		if bizTag == "" {
 			c.JSON(http.StatusBadRequest, 0)
+			return
 		}
-		c.JSON(http.StatusOK, builder.GetID(biz))
+		result := builder.GetID(bizTag)
+		ga.logger.Debug().Uint64("result", result).Msg("builder.GetID")
+
+		c.JSON(http.StatusOK, result)
 	}
 }
